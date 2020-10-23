@@ -489,6 +489,7 @@
       "seven-segment": "Display 7 segmentos"
     },
     "instanceName": {
+      "7segment": "display7segmentos",
       "button": "boton",
       "joystick": "joystick"
     }
@@ -770,6 +771,23 @@
     "create-folder": "Crear carpeta",
     "file-name": "Nombre del archivo",
     "folder-name": "Nombre de la carpeta",
+    "no-board-wizard": {
+      "check-title": "Comprueba la placa y el cable",
+      "check-text": "Y vuelve a intentarlo. Si el problema continua entones inténtalo más tarde.",
+      "check-ok": "Aceptar",
+      "drivers-title": "¿Y los drivers?",
+      "drivers-text": "¿Se han instalado los drivers de la placa en este ordenador?",
+      "drivers-ok": "Sí, los drivers están instalados",
+      "drivers-cancel": "No, instalar los drivers",
+      "no-board-connected-title": "No hay placa conectada",
+      "no-board-connected-text": "¿La placa está conectada al ordenador?",
+      "no-board-connected-ok": "Sí, está conectada",
+      "no-board-connected-cancel": "No, la conecto y vuelvo a intentarlo",
+      "no-board-selected-title": "No has seleccionado una placa",
+      "no-board-selected-text": "¿No has encontrado tu placa en la lista anterior?",
+      "no-board-selected-ok": "Si, pero le he dado a “Cancelar” igualmente",
+      "no-board-selected-cancel": "No, no estaba"
+    },
     "upload": "Cargar",
     "uploading-to-board": "Cargando en la placa...",
     "uploading-success": "Cargada correctamente",
@@ -800,7 +818,9 @@
       "con": "Con",
       "control": "Control",
       "fun": "Fun",
-      "functions": "Funciones"
+      "functions": "Funciones",
+      "mat": "Mat",
+      "math": "Matemáticas"
     },
     "bloqs": "Bloques",
     "blue": "azul",
@@ -809,22 +829,43 @@
     "diagram": "Diagrama",
     "drag-board-here": "Arrastra una placa o un robot aquí",
     "drop-bloq-here": "Arrastra un bloque aquí",
+    "during": "durante",
     "execute": "Ejecutar",
     "global-variables-and-functions": "Variables globales y funciones",
     "green": "verde",
     "hardware": "Hardware",
     "if": "Si",
+    "is": "está",
     "main-loop": "Bucle principal (Loop)",
+    "milliseconds": "milisegundos",
+    "not-pressed": "no pulsado",
+    "pin": "Pin",
     "pink": "rosa",
+    "play-buzzer-with-note": "Sonar el zumbador con la nota",
+    "pressed": "pulsado",
     "read": "Leer",
     "red": "rojo",
     "robots": "Robots",
     "setup-instructions": "Instrucciones iniciales (Setup)",
+    "tab-header": {
+      "component": "Bloques de componentes",
+      "control": "Bloqs de control",
+      "functions": "Bloques de funciones",
+      "math": "Bloques de matemáticas"
+    },
+    "tabs": {
+      "advanced": "Avanzados",
+      "basic": "Básicos",
+      "junior": "Junior"
+    },
     "the-led": "el LED",
+    "to-display": "en el display",
     "turn-on": "Encender",
     "turn-off": "Apagar",
+    "turn-off-zumjunior-rgb-led": "Apagar el LED de la placa",
     "turn-zumjunior-rgb-led": "Encender el LED de la placa con el color",
     "white": "blanco",
+    "write": "Escribir",
     "yellow": "amarillo"
   },
   "roles": {

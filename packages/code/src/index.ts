@@ -1,4 +1,6 @@
 import Code, { ICodeRef as ICodeRefImported } from "./Code";
+import NoBoardWizard from "./NoBoardWizard";
+import { knownBoards } from "./config";
 import useCodeUpload from "./useCodeUpload";
 
 export interface IError {
@@ -35,6 +37,6 @@ export interface ICodeContent {
   libraries: ILibrary[];
 }
 
-export { Code, useCodeUpload };
+export { Code, knownBoards, NoBoardWizard, useCodeUpload };
 
 export type ICodeRef = ICodeRefImported;

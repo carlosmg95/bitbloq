@@ -142,13 +142,14 @@ export const getCode = (
       pinName: string
     ) => {
       const portName = instance.ports?.[connectorName];
-      console.log("portName", portName);
       const port = portName && board.ports.find(p => p.name === portName);
-      console.log("port", port);
       const portPin = port && port.pins.find(p => p.name === pinName);
-      console.log("portPin", portPin);
       return portPin && portPin.value;
-    }
+    },
+    getBloqCode: (bloq: IBloq) =>
+      bloq && getBloqsCode([bloq], templateFunctions)[0],
+    getBloqsCode: (bloqs: IBloq[]) =>
+      bloqs && getBloqsCode(bloqs, templateFunctions).join("\n")
   };
 
   const componentsSections = componentInstances.map(instance =>
@@ -168,7 +169,7 @@ export const getCode = (
   const bloqSections = Object.values(BloqSection).reduce(
     (acc, section) => ({
       ...acc,
-      [section]: getBloqsCode(bloqs[section])
+      [section]: getBloqsCode(bloqs[section], templateFunctions)
     }),
     {}
   );
@@ -176,12 +177,9 @@ export const getCode = (
   /* Merge all code sections from board, component, bloqs into one */
   const codeSections = mergeCode([
     boardSections,
-    bloqSections,
-    ...componentsSections
+    ...componentsSections,
+    bloqSections
   ]);
-
-  console.log("Bloqs", bloqs);
-  console.log("code sections", codeSections);
 
   const data = {
     ...codeSections
@@ -197,18 +195,20 @@ const bloqTypesMap = bloqTypes.reduce(
   {}
 );
 
-export const getBloqsCode = (bloqs: IBloq[]): string[] =>
+export const getBloqsCode = (
+  bloqs: IBloq[],
+  templateFunctions: Record<string, any>
+): string[] =>
   bloqs.map(bloq => {
     const bloqType = bloqTypesMap[bloq.type];
     if (!bloqType.code) {
       return "";
     }
-    const childrenCode =
-      bloqType.instructionType === InstructionType.Block && bloq.children
-        ? getBloqsCode(bloq.children).join("\n")
-        : "";
 
-    return nunjucks.renderString(bloqType.code.main, { ...bloq, childrenCode });
+    return nunjucks.renderString(bloqType.code.main, {
+      ...bloq,
+      ...templateFunctions
+    });
   });
 
 interface IUseCodeGeneration {
@@ -268,6 +268,7 @@ const useCodeGeneration = (
   const onUpload = useRecoilCallback(({ snapshot }) => async () => {
     setCompiling({ uploading: true, visible: true });
     const board = await snapshot.getPromise(boardState);
+    const instances = await snapshot.getPromise(componentsState);
     if (!board) {
       return;
     }
@@ -275,7 +276,19 @@ const useCodeGeneration = (
 
     try {
       const boardObject = boardsMap[board.name];
-      const libraries = [...(boardObject.libraries || [])];
+      const components = instances.reduce((acc: IComponent[], instance) => {
+        const component = componentsMap[instance.component];
+        if (!acc.includes(component)) {
+          acc.push(component);
+        }
+        return acc;
+      }, []);
+      const libraries = [
+        ...(boardObject.libraries || []),
+        ...components.flatMap(c => c.libraries || [])
+      ];
+      console.log(libraries);
+
       await upload(
         [{ name: "main.ino", content: code }],
         libraries,

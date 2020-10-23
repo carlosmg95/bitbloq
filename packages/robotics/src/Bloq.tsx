@@ -5,28 +5,28 @@ import { IComponentInstance } from "@bitbloq/bloqs";
 import { useTranslate } from "@bitbloq/ui";
 import { bloqCategories } from "./config";
 import { IBloq, InstructionType } from "./types";
-import bloqs from "../config/bloqs.yml";
 import BloqList from "./BloqList";
 import BloqParameter from "./BloqParameter";
 import BloqSelect from "./BloqSelect";
 import BloqSelectComponent from "./BloqSelectComponent";
-import { replaceBloqs, bloqsState } from "./state";
-
-const bloqsMap = bloqs.reduce(
-  (acc, bloq) => ({ ...acc, [bloq.name]: bloq }),
-  {}
-);
+import BloqTextInput from "./BloqTextInput";
+import { getBloq, replaceBloqs, bloqsState } from "./state";
+import useBloqsDefinition from "./useBloqsDefinition";
+import useUpdateContent from "./useUpdateContent";
 
 export interface IBloqProps {
   bloq: IBloq;
   section: string;
   path: number[];
+  parameterName?: string;
 }
 
-const Bloq: FC<IBloqProps> = ({ bloq, section, path }) => {
+const Bloq: FC<IBloqProps> = ({ bloq, section, parameterName, path }) => {
   const t = useTranslate();
+  const updateContent = useUpdateContent();
+  const { getBloqType } = useBloqsDefinition();
 
-  const type = bloqsMap[bloq.type];
+  const type = getBloqType(bloq.type);
 
   const color = useMemo(() => {
     const category = bloqCategories.find(c => c.name === type.category);
@@ -42,16 +42,34 @@ const Bloq: FC<IBloqProps> = ({ bloq, section, path }) => {
     ({ set, snapshot }) => async (newBloq: IBloq) => {
       const bloqs = await snapshot.getPromise(bloqsState);
       const sectionBloqs = bloqs[section];
-      const newSectionBloqs = replaceBloqs(sectionBloqs, path, 1, [newBloq]);
+      let updatedBloq;
+      if (isParameter && parameterName) {
+        const parentBloq = getBloq(sectionBloqs, path);
+        updatedBloq = {
+          ...parentBloq,
+          parameters: {
+            ...(parentBloq.parameters || {}),
+            [parameterName]: newBloq
+          }
+        };
+      } else {
+        updatedBloq = newBloq;
+      }
+      console.log("UPDATE BLOQ", updatedBloq);
+      const newSectionBloqs = replaceBloqs(sectionBloqs, path, 1, [
+        updatedBloq
+      ]);
       set(bloqsState, {
         ...bloqs,
         [section]: newSectionBloqs
       });
+      updateContent();
     }
   );
 
   return (
     <Container>
+      {false && <ErrorContainer />}
       <Header>
         {isParameter && <HeaderNodge style={{ backgroundColor: color }} />}
         <HeaderContent
@@ -122,6 +140,29 @@ const Bloq: FC<IBloqProps> = ({ bloq, section, path }) => {
                 );
               }
 
+              case "text-input": {
+                return (
+                  <BloqTextInput
+                    size={2}
+                    type="text"
+                    key={i}
+                    value={
+                      (bloq.parameters?.[uiElement.parameterName] as string) ||
+                      ""
+                    }
+                    onChange={e =>
+                      onBloqChange({
+                        ...bloq,
+                        parameters: {
+                          ...(bloq.parameters || {}),
+                          [uiElement.parameterName]: e.target.value
+                        }
+                      })
+                    }
+                  />
+                );
+              }
+
               default:
                 return null;
             }
@@ -155,6 +196,7 @@ const Container = styled.div`
 `;
 
 const Header = styled.div`
+  position: relative;
   display: flex;
   align-items: center;
 `;
@@ -205,4 +247,12 @@ const Footer = styled.div`
 const Label = styled.div`
   color: white;
   white-space: nowrap;
+`;
+
+const ErrorContainer = styled.div`
+  position: absolute;
+  height: 40px;
+  left: 0px;
+  right: 0px;
+  background-color: #ffd6d6;
 `;

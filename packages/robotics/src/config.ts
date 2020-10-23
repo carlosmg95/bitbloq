@@ -1,4 +1,4 @@
-import { BloqCategory } from "./types";
+import { BloqCategory, BloqSubCategory } from "./types";
 
 export const bloqCategories = [
   {
@@ -18,5 +18,17 @@ export const bloqCategories = [
     iconText: "robotics.bloq-categories.con",
     label: "robotics.bloq-categories.control",
     color: "#11489a"
+  },
+  {
+    name: BloqCategory.Math,
+    iconText: "robotics.bloq-categories.mat",
+    label: "robotics.bloq-categories.math",
+    color: "#01c0c8"
   }
+];
+
+export const bloqSubCategories = [
+  BloqSubCategory.Junior,
+  BloqSubCategory.Basic,
+  BloqSubCategory.Advanced
 ];

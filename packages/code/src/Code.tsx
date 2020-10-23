@@ -72,7 +72,7 @@ const parseErrors = (borndateErrors: any[]) =>
     return {
       message: e.message,
       file: file === "main.ino.cpp" ? "main.ino" : file,
-      line: file === "main.ino" ? line - 4 : line,
+      line: file === "main.ino.cpp" ? line - 5 : line,
       column
     };
   });
@@ -125,7 +125,7 @@ const Code: RefForwardingComponent<ICodeRef, ICodeProps> = (
     }
   }));
 
-  const { upload, compile, uploadContent } = useCodeUpload({
+  const { upload, compile } = useCodeUpload({
     filesRoot: borndateFilesRoot
   });
 
@@ -240,7 +240,8 @@ const Code: RefForwardingComponent<ICodeRef, ICodeProps> = (
 
   const onCompile = async () => {
     try {
-      await compile(content.current!.files, libraries, board);
+      const hex = await compile(content.current!.files, libraries, board);
+      console.log(hex);
       setErrors([]);
     } catch (e) {
       switch (e.type) {
@@ -314,7 +315,6 @@ const Code: RefForwardingComponent<ICodeRef, ICodeProps> = (
         )}
         <StatusBar></StatusBar>
       </Main>
-      {uploadContent}
       <NewFileModal
         isOpen={newFileOpen}
         fileExtension={newFileExtension}

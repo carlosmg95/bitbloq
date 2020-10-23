@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
-import { useTranslate } from "@bitbloq/ui";
 import {
   useCodeUpload,
   ICodeUploadOptions
 } from "@bitbloq/code/src/useCodeUpload";
+import NoBoardWizard from "@bitbloq/code/src/NoBoardWizard";
 import { bloqTypes as partialBloqTypes } from "./bloqTypes";
 import { boards as partialBoards } from "./boards";
 import { components as partialComponents } from "./components";
-import { juniorLibraries } from "./config";
 import {
   HorizontalBloqEditor,
   HardwareDesigner,
@@ -22,7 +21,10 @@ import {
   IExtraData,
   isBloqSelectComponentParameter
 } from "@bitbloq/bloqs";
+import { useTranslate } from "@bitbloq/ui";
 import migrateContent from "./migrate-content";
+import UploadSpinner from "./UploadSpinner";
+import useDebug from "./useDebug";
 
 export interface IJuniorCallbackProps {
   hardware: JSX.Element;
@@ -43,6 +45,7 @@ export interface IJuniorProps {
   uploadOptions: ICodeUploadOptions;
   externalUpload?: boolean;
   readOnly?: boolean;
+  debugSpeed?: number;
 }
 
 const bloqTypes = partialBloqTypes as IBloqType[];
@@ -55,11 +58,37 @@ const Junior: React.FunctionComponent<IJuniorProps> = ({
   onContentChange,
   uploadOptions,
   externalUpload,
-  readOnly
+  readOnly,
+  debugSpeed = 1000
 }) => {
   const t = useTranslate();
 
-  const { upload, cancel, uploadContent } = useCodeUpload(uploadOptions);
+  const [uploading, setUploading] = useState(false);
+  const [uploadingVisible, setUploadingVisible] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadText, setUploadText] = useState("");
+  const [showNoBoardWizard, setShowNoBoardWizard] = useState(false);
+  const hideTimeout = useRef(0);
+  useEffect(() => {
+    if (uploading) {
+      setUploadingVisible(true);
+    }
+
+    if (!uploading) {
+      hideTimeout.current = window.setTimeout(() => {
+        setUploadingVisible(false);
+      }, 5000);
+    }
+  }, [uploading]);
+
+  useEffect(() => {
+    if (!uploadingVisible && hideTimeout.current) {
+      clearTimeout(hideTimeout.current);
+      hideTimeout.current = 0;
+    }
+  }, [uploadingVisible]);
+
+  const { upload, cancel } = useCodeUpload(uploadOptions);
 
   const migratedContent = useMemo(() => migrateContent(initialContent), [
     initialContent
@@ -71,6 +100,13 @@ const Junior: React.FunctionComponent<IJuniorProps> = ({
     components: []
   };
   const extraData: IExtraData = content.extraData || {};
+  const {
+    activeBloqs,
+    isDebugging,
+    startDebugging,
+    stopDebugging,
+    uploadFirmware
+  } = useDebug(program, extraData, debugSpeed);
 
   const [undoPast, setUndoPast] = useState<any[]>([]);
   const [undoFuture, setUndoFuture] = useState<any[]>([]);
@@ -181,7 +217,33 @@ const Junior: React.FunctionComponent<IJuniorProps> = ({
       )
   );
 
-  const onUpload = (onPortOpen?: () => void) => {
+  const onStartDebugging = async () => {
+    setUploadText(t("code.uploading-to-board"));
+    setUploading(true);
+    try {
+      await uploadFirmware(hardware);
+      setUploading(false);
+      setUploadingVisible(false);
+    } catch (e) {
+      setUploadSuccess(false);
+      setUploading(false);
+      if (e.type === "board-not-found") {
+        setUploadingVisible(false);
+        setShowNoBoardWizard(true);
+        return;
+      }
+    }
+    startDebugging(hardware);
+  };
+
+  const onUpload = async (onPortOpen?: () => void) => {
+    setUploading(true);
+    setUploadSuccess(false);
+    setUploadText(t("code.uploading-to-board"));
+
+    if (isDebugging) {
+      await stopDebugging();
+    }
     const programBloqs = program
       .filter(line => !line.disabled)
       .map(line => line.bloqs);
@@ -194,17 +256,47 @@ const Junior: React.FunctionComponent<IJuniorProps> = ({
       programBloqs,
       extraData
     );
+
+    const libraries = [
+      ...(board.libraries || []),
+      ...hardware.components.flatMap(
+        c => componentMap[c.component]?.libraries || []
+      )
+    ].filter((l, i, libs) => libs.findIndex(m => m.zipURL === l.zipURL) === i);
+
     try {
-      upload(
+      await upload(
         [{ name: "main.ino", content: code }],
-        juniorLibraries,
+        libraries,
         "zumjunior",
         onPortOpen
       );
+      setUploadSuccess(true);
+      setUploadText(t("code.uploading-success"));
     } catch (e) {
-      console.error(e.data);
+      setUploadSuccess(false);
+      if (e.type === "board-not-found") {
+        setUploadingVisible(false);
+        setShowNoBoardWizard(true);
+      } else if (e.type === "compile-error") {
+        setUploadText(t("code.uploading-error"));
+        console.log(e.data);
+      }
     }
+    setUploading(false);
   };
+
+  const uploadContent = (
+    <UploadSpinner
+      visible={uploadingVisible}
+      uploading={uploading}
+      success={uploadSuccess}
+      text={uploadText}
+      onClick={() => {
+        !uploading && setUploadingVisible(false);
+      }}
+    />
+  );
 
   return children({
     hardware: (
@@ -231,6 +323,9 @@ const Junior: React.FunctionComponent<IJuniorProps> = ({
             onLinesChange={(newProgram: IBloqLine[]) =>
               updateContent({ program: newProgram, hardware, extraData })
             }
+            isDebugging={isDebugging}
+            onStartDebugging={() => onStartDebugging()}
+            onStopDebugging={stopDebugging}
             onUpload={() => onUpload()}
             board={board}
             externalUpload={externalUpload}
@@ -239,8 +334,14 @@ const Junior: React.FunctionComponent<IJuniorProps> = ({
             onExtraDataChange={(newExtraData: IExtraData) =>
               updateContent({ extraData: newExtraData, hardware, program })
             }
+            activeBloqs={activeBloqs}
           />
           {!externalUpload && uploadContent}
+          <NoBoardWizard
+            driversUrl="https://storage.googleapis.com/bitbloq-qa/zumjunior_windows_drivers.zip"
+            isOpen={showNoBoardWizard}
+            onClose={() => setShowNoBoardWizard(false)}
+          />
         </>
       ) : null;
     },
