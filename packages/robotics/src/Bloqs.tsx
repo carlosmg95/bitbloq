@@ -1,9 +1,12 @@
-import React, { FC } from "react";
+import React, { FC, useState } from "react";
 import styled from "@emotion/styled";
+import CompilingAlert from "@bitbloq/code/src/CompilingAlert";
+import { useCodeUpload } from "@bitbloq/code/src/useCodeUpload";
 import {
   breakpoints,
   colors,
   DragAndDropProvider,
+  Droppable,
   Icon,
   useTranslate
 } from "@bitbloq/ui";
@@ -12,12 +15,18 @@ import { useRecoilState, useResetRecoilState, useSetRecoilState } from "recoil";
 import {
   bloqsState,
   BloqSection,
+  compilingState,
+  detachedBloqsState,
   draggingBloqsState,
   isDraggingParameterState,
-  replaceBloqs
+  getBloq,
+  replaceBloqs,
+  replaceParameter
 } from "./state";
 import BloqCanvas from "./BloqCanvas";
+import BloqList from "./BloqList";
 import BloqsTabs from "./BloqsTabs";
+import CodeViewer from "./CodeViewer";
 import DraggingBloq from "./DraggingBloq";
 import ExpandablePanel from "./ExpandablePanel";
 import useCodeGeneration from "./useCodeGeneration";
@@ -33,14 +42,20 @@ const Bloqs: FC<IBloqsProps> = ({ borndateFilesRoot }) => {
   const updateContent = useUpdateContent();
   const { getBloqType } = useBloqsDefinition();
 
+  const [compiling, setCompiling] = useRecoilState(compilingState);
   const setDraggingBloq = useSetRecoilState(draggingBloqsState);
   const setIsDraggingParameter = useSetRecoilState(isDraggingParameterState);
   const resetDraggingBloq = useResetRecoilState(draggingBloqsState);
 
-  const { compile, upload } = useCodeGeneration({
+  const [viewCode, setViewCode] = useState(false);
+
+  const generateCode = useCodeGeneration();
+  const { compile, upload, cancel } = useCodeUpload({
     filesRoot: borndateFilesRoot
   });
+
   const [bloqs, setBloqs] = useRecoilState(bloqsState);
+  const [detachedBloqs, setDetachedBloqs] = useRecoilState(detachedBloqsState);
 
   const onDragStart = ({ draggableData }) => {
     if (draggableData.bloqs && draggableData.bloqs.length) {
@@ -49,13 +64,36 @@ const Bloqs: FC<IBloqsProps> = ({ borndateFilesRoot }) => {
         bloqType.instructionType === InstructionType.Parameter
       );
       if (draggableData.type === "bloq-list") {
+        if (draggableData.section === "detached") {
+          setDetachedBloqs(
+            detachedBloqs.filter((b, i) => i !== draggableData.path[0])
+          );
+        } else {
+          setBloqs({
+            ...bloqs,
+            [draggableData.section]: replaceBloqs(
+              bloqs[draggableData.section],
+              draggableData.path,
+              draggableData.bloqs.length,
+              []
+            )
+          });
+        }
+      }
+      if (draggableData.type === "bloq-parameter") {
         setBloqs({
           ...bloqs,
           [draggableData.section]: replaceBloqs(
             bloqs[draggableData.section],
             draggableData.path,
-            draggableData.bloqs.length,
-            []
+            1,
+            [
+              replaceParameter(
+                getBloq(bloqs[draggableData.section], draggableData.path),
+                draggableData.parameterPath,
+                undefined
+              )
+            ]
           )
         });
       }
@@ -73,7 +111,7 @@ const Bloqs: FC<IBloqsProps> = ({ borndateFilesRoot }) => {
     resetDraggingBloq();
   };
 
-  const onDrop = ({ draggableData, droppableData }) => {
+  const onDrop = ({ draggableData, droppableData, x, y }) => {
     if (droppableData.type === "bloq-droppable") {
       const newSectionBloqs = replaceBloqs(
         bloqs[droppableData.section],
@@ -94,13 +132,11 @@ const Bloqs: FC<IBloqsProps> = ({ borndateFilesRoot }) => {
         droppableData.path,
         1,
         [
-          {
-            ...droppableData.bloq,
-            parameters: {
-              ...droppableData.bloq.parameters,
-              [droppableData.parameterName]: draggableData.bloqs[0]
-            }
-          }
+          replaceParameter(
+            getBloq(sectionBloqs, droppableData.path),
+            droppableData.parameterPath,
+            draggableData.bloqs[0]
+          )
         ]
       );
       setBloqs({
@@ -115,6 +151,46 @@ const Bloqs: FC<IBloqsProps> = ({ borndateFilesRoot }) => {
         [droppableData.section]: draggableData.bloqs
       });
       updateContent();
+    }
+    if (droppableData.type === "main") {
+      setDetachedBloqs([
+        ...detachedBloqs,
+        { bloqs: draggableData.bloqs, x, y }
+      ]);
+    }
+  };
+
+  const onCompileClick = async () => {
+    const { code, libraries, boardObject } = await generateCode();
+    if (!boardObject) return;
+    try {
+      setCompiling({ compiling: true, visible: true });
+      await compile(
+        [{ name: "main.ino", content: code }],
+        libraries,
+        boardObject.borndateBoard || ""
+      );
+      setCompiling({ compileSuccess: true, visible: false });
+    } catch (e) {
+      setCompiling({ compileError: true, visible: false });
+      console.log(e, e.data);
+    }
+  };
+
+  const onUploadClick = async () => {
+    const { code, libraries, boardObject } = await generateCode();
+    if (!boardObject) return;
+    try {
+      setCompiling({ uploading: true, visible: true });
+      await upload(
+        [{ name: "main.ino", content: code }],
+        libraries,
+        boardObject.borndateBoard || ""
+      );
+      setCompiling({ uploadSuccess: true, visible: false });
+    } catch (e) {
+      setCompiling({ uploadError: true, visible: false });
+      console.log(e, e.data);
     }
   };
 
@@ -137,32 +213,44 @@ const Bloqs: FC<IBloqsProps> = ({ borndateFilesRoot }) => {
               </ToolbarButton>
             </ToolbarLeft>
             <ToolbarRight>
-              <ToolbarGreenButton onClick={compile}>
+              <ToolbarGreenButton onClick={onCompileClick}>
                 <Icon name="tick" />
               </ToolbarGreenButton>
-              <ToolbarGreenButton onClick={upload}>
+              <ToolbarGreenButton onClick={onUploadClick}>
                 <UploadIcon name="arrow" />
               </ToolbarGreenButton>
             </ToolbarRight>
           </Toolbar>
-          <BloqsContent>
+          <BloqsContent data={{ type: "main" }} priority={-1}>
             <ExpandablePanel
               title={t("robotics.global-variables-and-functions")}
-              startsOpen
             >
               <BloqCanvas section={BloqSection.Global} />
             </ExpandablePanel>
             <ExpandablePanel title={t("robotics.setup-instructions")}>
               <BloqCanvas section={BloqSection.Setup} />
             </ExpandablePanel>
-            <ExpandablePanel title={t("robotics.main-loop")}>
+            <ExpandablePanel title={t("robotics.main-loop")} startsOpen>
               <BloqCanvas section={BloqSection.Loop} />
             </ExpandablePanel>
+            {detachedBloqs.map(({ x, y, bloqs }, i) => (
+              <DetachedBloq
+                key={`detached-bloq-${i}`}
+                style={{ transform: `translate(${x}px, ${y}px)` }}
+              >
+                <BloqList bloqs={bloqs} section="detached" path={[i]} />
+              </DetachedBloq>
+            ))}
           </BloqsContent>
         </Main>
-        <BloqsTabs />
+        <BloqsTabs
+          onViewCode={() => setViewCode(true)}
+          viewingCode={viewCode}
+        />
+        {viewCode && <CodeViewer onClose={() => setViewCode(false)} />}
         <DraggingBloq />
       </Container>
+      <CompilingAlert {...compiling} onCancel={cancel} />
     </DragAndDropProvider>
   );
 };
@@ -172,12 +260,14 @@ export default Bloqs;
 const Container = styled.div`
   flex: 1;
   display: flex;
+  max-width: 100%;
 `;
 
 const Main = styled.div`
   flex: 1;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 `;
 
 const Toolbar = styled.div`
@@ -231,8 +321,15 @@ const UploadIcon = styled(Icon)`
   transform: rotate(90deg);
 `;
 
-const BloqsContent = styled.div`
+const BloqsContent = styled(Droppable)`
   flex: 1;
   padding: 20px;
   overflow-y: auto;
+  position: relative;
+`;
+
+const DetachedBloq = styled.div`
+  position: absolute;
+  top: 0px;
+  left: 0px;
 `;

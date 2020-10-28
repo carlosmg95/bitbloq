@@ -16,6 +16,7 @@ import CityElements from "./icons/CityElements";
 import Clock from "./icons/Clock";
 import Close from "./icons/Close";
 import CloudLogo from "./icons/CloudLogo";
+import Code from "./icons/Code";
 import Column from "./icons/Column";
 import Cone from "./icons/Cone";
 import Crotchet from "./icons/Crotchet";
@@ -108,6 +109,7 @@ import Semiquaver from "./icons/Semiquaver";
 import SemiCylinder from "./icons/SemiCylinder";
 import Sphere from "./icons/Sphere";
 import Spinner from "./icons/Spinner";
+import SpinnerSmall from "./icons/SpinnerSmall";
 import Star from "./icons/Star";
 import Stop from "./icons/Stop";
 import STL from "./icons/STL";
@@ -176,6 +178,8 @@ const Icon: React.SFC<IIconProps> = ({ name, className }) => {
       return <Close className={className} />;
     case "cloud-logo":
       return <CloudLogo className={className} />;
+    case "code":
+      return <Code className={className} />;
     case "column":
       return <Column className={className} />;
     case "crotchet":
@@ -350,6 +354,8 @@ const Icon: React.SFC<IIconProps> = ({ name, className }) => {
       return <SemiCylinder className={className} />;
     case "spinner":
       return <Spinner className={className} />;
+    case "spinner-small":
+      return <SpinnerSmall className={className} />;
     case "stl":
       return <STL className={className} />;
     case "threed":
